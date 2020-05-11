@@ -1,0 +1,207 @@
+{
+    "code": "crow",
+    "class": "EntityAgent",
+    "hitboxSize": { "x": 0.5, "y": 0.6 },
+    "deadHitboxSize": { "x": 0.5, "y": 0.25 },
+    "eyeHeight": 0.5,
+    "drops": [],
+    "client": {
+        "renderer": "Shape",
+        "shape": {
+            "base": "crow"
+        },
+		"texture": { "base": "crow" },
+        "behaviors": [
+            { "code": "repulseagents" },
+            { "code": "controlledphysics", "stepHeight": 1.1251 },
+            { "code": "floatupwhenstuck", "onlyWhenDead": true },
+            { "code": "interpolateposition" },
+            { "code": "harvestable" }
+        ],
+        "animations": [
+            {
+                "code": "hurt",
+                "animation": "hurt",
+                "animationSpeed": 2.2,
+                "weight": 10,
+                "blendMode": "AddAverage"
+            },
+            {
+                "code": "eat",
+                "animation": "eat",
+                "animationSpeed": 1,
+                "weight": 1,
+                "blendMode": "Add"
+            },
+            {
+                "code": "idle",
+                "animation": "idle",
+                "blendMode": "AddAverage",
+                "easeOutSpeed": 4,
+                "triggeredBy": {
+                    "defaultAnim": true
+                }
+            },
+            {
+                "code": "die",
+                "animation": "death",
+                "animationSpeed": 1.25,
+                "weight": 10,
+                "blendMode": "Average",
+                "triggeredBy": {
+                    "onControls": [
+                        "dead"
+                    ]
+                }
+            },
+            {
+                "code": "sleep",
+                "animation": "sleep",
+                "easeInSpeed": 4,
+                "easeOutSpeed": 4,
+                "blendMode": "Average"
+            },
+            {
+                "code": "sit",
+                "animation": "sit",
+                "easeInSpeed": 4,
+                "easeOutSpeed": 4,
+                "blendMode": "Average"
+            }
+        ]
+    },
+    "server": {
+        "attributes": {
+            "pathfinder": {
+                "minTurnAnglePerSec": 720,
+                "maxTurnAnglePerSec": 1440
+            }
+        },
+        "behaviors": [
+            {
+                "code": "repulseagents"
+            },
+            {
+                "code": "controlledphysics",
+                "stepHeight": 1.1251
+            },
+            {
+                "code": "despawn",
+                "minPlayerDistance": 8,
+                "belowLightLevel": 8,
+                "minSeconds": 300
+            },
+            {
+                "code": "health",
+                "currenthealth": 3,
+                "maxhealth": 3
+            },
+            {
+                "code": "deaddecay",
+                "hoursToDecay": 96,
+                "decayedBlock": "carcass-tiny"
+            },
+            {
+                "code": "harvestable",
+                "drops": [
+                    {
+                        "type": "item",
+                        "code": "poultry-raw",
+                        "quantity": {
+                            "avg": 0.75,
+                            "var": 0.25
+                        }
+                    },
+                    {
+                        "type": "item",
+                        "code": "feather",
+                        "quantity": {
+                            "avg": 2,
+                            "var": 2
+                        }
+                    }
+                ]
+            },
+            {
+                "code": "floatupwhenstuck",
+                "onlyWhenDead": true
+            },
+            {
+                "code": "breathe"
+            },
+            {
+                "code": "taskai",
+                "aitasks": [
+                    {
+                        "code": "fleeentity",
+                        "entityCodes": [
+                            "wolf-male",
+                            "wolf-female",
+                            "fox-*"
+                        ],
+                        "priority": 1.5,
+                        "movespeed": 0.033,
+                        "animationSpeed": 2.4,
+                        "seekingRange": 7,
+                        "animation": "Run",
+                        "sound": "creature/chicken/hen-flee"
+                    },
+                    {
+                        "code": "getoutofwater",
+                        "priority": 1.4,
+                        "movespeed": 0.02,
+                        "animation": "Run",
+                        "sound": "creature/chicken/hen-flee"
+                    },
+                    {
+                        "code": "perch",
+                        "priority": 1.25,
+                        "minDuration": 10000,
+                        "maxDuration": 10000,
+                        "priorityForCancel": 1.38,
+                        "animation": "idle",
+                        "stopOnNearbyEntityCodes": [
+                            "wolf-male",
+                            "wolf-female",
+                            "fox-*"
+                        ],
+                        "stopRange": 8,
+                        "stopOnHurt": true
+                    }
+                ]
+            }
+        ],
+        "spawnconditions": {
+            "runtime": {
+                "group": "neutral",
+                "tryOnlySurface": true,
+                "chance": 0.0009,
+                //"chance": 0.1,  // DEBUG
+                "maxQuantity": 4,
+                "groupSize": {
+                    "avg": 1.5,
+                    "var": 0.6
+                },
+                "insideBlockCodes": [
+                    "game:air",
+                    "game:tallgrass-*",
+                    "game:snowlayer-1",
+                    "game:frostedtallgrass-*"
+                ],
+                "minTemp": -4,
+                "maxTemp": 20,
+                "minRain": 0.4,
+                "minForestOrShrubs": 0.5,
+                "maxForest": 1,
+                "maxShrubs": 1,
+                "companions": []
+            }
+        }
+    },
+    "sounds": {
+        "hurt": "creature/chicken/hurt",
+        "death": "creature/chicken/hurt",
+        "idle": "418262__inspectorj__crow-call-single-a"
+    },
+    "idleSoundChance": 0.03
+}
