@@ -70,7 +70,7 @@ namespace Birds
 
         public override bool ShouldExecute()
         {
-            return true;
+            return entity.World.ElapsedMilliseconds > cooldownUntilMs;
         }
 
         public override void StartExecute()
@@ -130,44 +130,46 @@ namespace Birds
                 entity.Controls.IsFlying = false;
                 entity.Controls.Forward = false;
                 entity.Controls.FlyVector.Set(0, 0, 0);
-            }
-            else
-            {
-                entity.Controls.IsFlying = true;
-
-                float targetRoll = 0;
-                float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
-                float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
-
-                Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
-                if (distance > flightSpeed)
-                    targetFlyVector.Mul(flightSpeed / distance);
-
-                float turnLimit = 0.1F;
-                entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
-                entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
-                entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
-
-                double maxAcceleration = 0.01;
-                Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
-                acceleration.Sub(entity.Controls.FlyVector);
-                double accelerationMagnitude = acceleration.Length();
-                if (accelerationMagnitude > maxAcceleration)
-                    acceleration.Mul(maxAcceleration / accelerationMagnitude);
-
-                entity.Controls.FlyVector.Add(acceleration);
-
-                entity.World.Logger.Debug($"pos=[{entity.ServerPos}], target=[{target}], " +
-                        $"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
-                        $"flyVector=[{entity.Controls.FlyVector}]");
+                // !IsFlying should really get us gravity, but it's apparently not enough.
+                entity.Properties.Habitat = EnumHabitat.Land;
+                return false;
             }
 
-            return entity.World.ElapsedMilliseconds < endTime;
+            entity.Controls.IsFlying = true;
+            entity.Properties.Habitat = EnumHabitat.Air;
+
+            float targetRoll = 0;
+            float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
+            float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
+
+            Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
+            if (distance > flightSpeed)
+                targetFlyVector.Mul(flightSpeed / distance);
+
+            float turnLimit = 0.1F;
+            entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
+            entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
+            entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
+
+            double maxAcceleration = 0.01;
+            Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
+            acceleration.Sub(entity.Controls.FlyVector);
+            double accelerationMagnitude = acceleration.Length();
+            if (accelerationMagnitude > maxAcceleration)
+                acceleration.Mul(maxAcceleration / accelerationMagnitude);
+
+            entity.Controls.FlyVector.Add(acceleration);
+
+            entity.World.Logger.Debug($"habitat={entity.Properties.Habitat} pos=[{entity.ServerPos}], target=[{target}], " +
+                    $"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
+                    $"flyVector=[{entity.Controls.FlyVector}]");
+
+            return true;
         }
 
         public override void FinishExecute(bool cancelled)
         {
-            entity.World.Logger.Debug("AiTaskPerch.FinishExecute()");
+            entity.World.Logger.Debug($"AiTaskPerch.FinishExecute(cancelled={cancelled})");
             base.FinishExecute(cancelled);
         }
     }

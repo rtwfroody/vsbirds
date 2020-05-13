@@ -1,6 +1,7 @@
 {
     "code": "crow",
     "class": "EntityAgent",
+    "habitat": "Air",
     "hitboxSize": { "x": 0.5, "y": 0.6 },
     "deadHitboxSize": { "x": 0.5, "y": 0.25 },
     "eyeHeight": 0.5,
@@ -78,13 +79,8 @@
             }
         },
         "behaviors": [
-            {
-                "code": "repulseagents"
-            },
-            {
-                "code": "controlledphysics",
-                "stepHeight": 1.1251
-            },
+            { "code": "repulseagents" },
+            { "code": "controlledphysics", "stepHeight": 1.1251 },
             {
                 "code": "despawn",
                 "minPlayerDistance": 8,
@@ -122,21 +118,15 @@
                     }
                 ]
             },
-            {
-                "code": "floatupwhenstuck",
-                "onlyWhenDead": true
-            },
-            {
-                "code": "breathe"
-            },
+            { "code": "floatupwhenstuck", "onlyWhenDead": true },
+            { "code": "breathe" },
             {
                 "code": "taskai",
                 "aitasks": [
                     {
                         "code": "fleeentity",
                         "entityCodes": [
-                            "wolf-male",
-                            "wolf-female",
+                            "wolf-*",
                             "fox-*"
                         ],
                         "priority": 1.5,
@@ -157,15 +147,22 @@
                         "code": "perch",
                         "flightSpeed": 0.01,
                         "priority": 1.25,
-                        "minDuration": 10000,
-                        "maxDuration": 10000,
                         "priorityForCancel": 1.38,
+                        "animation": "flap",
+                        "stopOnNearbyEntityCodes": [ "wolf-*", "fox-*" ],
+                        "stopRange": 8,
+                        "stopOnHurt": true,
+                        "mincooldown": 1000,
+                        "maxcooldown": 10000
+                    },
+                    {
+                        "code": "idle",
+                        "priority": 1.1,
+                        "priorityForCancel": 1.38,
+						"minduration": 1000,    // TODO: multiply by 10
+						"maxduration": 6000,
                         "animation": "idle",
-                        "stopOnNearbyEntityCodes": [
-                            "wolf-male",
-                            "wolf-female",
-                            "fox-*"
-                        ],
+                        "stopOnNearbyEntityCodes": [ "wolf-*", "fox-*" ],
                         "stopRange": 8,
                         "stopOnHurt": true
                     }
