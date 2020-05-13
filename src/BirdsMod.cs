@@ -7,31 +7,31 @@ using Vintagestory.API;
 using Vintagestory.API.Common.Entities;
 
 [assembly: ModInfo( "Birds",
-	Description = "TODO",
-	Website     = "TODO",
-	Authors     = new []{ "Tim Newsome <tim@casualhacker.net>" } )]
+    Description = "TODO",
+    Website     = "TODO",
+    Authors     = new []{ "Tim Newsome <tim@casualhacker.net>" } )]
 
 namespace Birds
 {
-	public class BirdMod : ModSystem
-	{
+    public class BirdMod : ModSystem
+    {
         static BirdMod()
         {
             Vintagestory.GameContent.AiTaskRegistry.Register<AiTaskPerch>("perch");
         }
 
         public override void Start(ICoreAPI api)
-		{
-		}
+        {
+        }
 
-		public override void StartClientSide(ICoreClientAPI api)
-		{
-		}
+        public override void StartClientSide(ICoreClientAPI api)
+        {
+        }
 
-		public override void StartServerSide(ICoreServerAPI api)
-		{
-		}
-	}
+        public override void StartServerSide(ICoreServerAPI api)
+        {
+        }
+    }
 
     public class AiTaskPerch : Vintagestory.API.Common.AiTaskBase
     {
@@ -122,26 +122,44 @@ namespace Birds
 
         public override bool ContinueExecute(float dt)
         {
-            entity.Controls.FlyVector.Set(target);
-            entity.Controls.FlyVector.Sub(entity.ServerPos.XYZ);
-            double distance = entity.Controls.FlyVector.Length();
+            Vec3d delta = new Vec3d(target.X, target.Y, target.Z);
+            delta.Sub(entity.ServerPos.XYZ);
+            double distance = delta.Length();
             if (distance < 0.5)
             {
-                entity.Controls.FlyVector.Set(0, 0, 0);
                 entity.Controls.IsFlying = false;
+                entity.Controls.Forward = false;
+                entity.Controls.FlyVector.Set(0, 0, 0);
             }
             else
             {
                 entity.Controls.IsFlying = true;
+
+                float targetRoll = 0;
+                float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
+                float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
+
+                Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
                 if (distance > flightSpeed)
-                    entity.Controls.FlyVector.Mul(flightSpeed / distance);
+                    targetFlyVector.Mul(flightSpeed / distance);
 
-                float roll = 0;
-                float yaw = (float) Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
-                float pitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
-                entity.ServerPos.SetAngles(roll, yaw, pitch);
+                float turnLimit = 0.1F;
+                entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
+                entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
+                entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
 
-                entity.World.Logger.Debug($"pos={entity.ServerPos}, target={target}, vector={entity.Controls.FlyVector}");
+                double maxAcceleration = 0.01;
+                Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
+                acceleration.Sub(entity.Controls.FlyVector);
+                double accelerationMagnitude = acceleration.Length();
+                if (accelerationMagnitude > maxAcceleration)
+                    acceleration.Mul(maxAcceleration / accelerationMagnitude);
+
+                entity.Controls.FlyVector.Add(acceleration);
+
+                entity.World.Logger.Debug($"pos=[{entity.ServerPos}], target=[{target}], " +
+                        $"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
+                        $"flyVector=[{entity.Controls.FlyVector}]");
             }
 
             return entity.World.ElapsedMilliseconds < endTime;

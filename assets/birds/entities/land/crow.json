@@ -155,6 +155,7 @@
                     },
                     {
                         "code": "perch",
+                        "flightSpeed": 0.01,
                         "priority": 1.25,
                         "minDuration": 10000,
                         "maxDuration": 10000,
