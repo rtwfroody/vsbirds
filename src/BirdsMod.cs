@@ -15,6 +15,21 @@ namespace Birds
 {
     public class BirdMod : ModSystem
     {
+        static public bool almostEqual(double a, double b, double epsilon)
+        {
+            return Math.Abs(a - b) < epsilon;
+        }
+
+        static public bool positionAlmostEqual(EntityPos a, EntityPos b)
+        {
+            return almostEqual(a.X, b.X, .001) &&
+                almostEqual(a.Y, b.Y, .001) &&
+                almostEqual(a.Z, b.Z, .001) &&
+                almostEqual(a.Pitch, b.Pitch, .001) &&
+                almostEqual(a.Roll, b.Roll, .001) &&
+                almostEqual(a.Yaw, b.Yaw, .001);
+        }
+
         static BirdMod()
         {
             Vintagestory.GameContent.AiTaskRegistry.Register<AiTaskPerch>("perch");
@@ -40,6 +55,7 @@ namespace Birds
         int minDistance;
         int minDuration, maxDuration;
         double flightSpeed;
+        EntityPos previousPos;
 
         Vintagestory.GameContent.EntityPartitioning partitionUtil;
 
@@ -117,6 +133,7 @@ namespace Birds
             }
             target.X += 0.5;
             target.Z += 0.5;
+            target.Y += 0.5;
             entity.World.Logger.Debug($"target={target}");
         }
 
@@ -125,44 +142,45 @@ namespace Birds
             Vec3d delta = new Vec3d(target.X, target.Y, target.Z);
             delta.Sub(entity.ServerPos.XYZ);
             double distance = delta.Length();
-            if (distance < 0.5)
+            if (distance < 0.2)
             {
-                entity.Controls.IsFlying = false;
-                entity.Controls.Forward = false;
+                entity.World.Logger.Debug($"previousPosition={previousPos}, serverPos={entity.ServerPos}");
                 entity.Controls.FlyVector.Set(0, 0, 0);
-                // !IsFlying should really get us gravity, but it's apparently not enough.
-                entity.Properties.Habitat = EnumHabitat.Land;
-                return false;
+                if (BirdMod.positionAlmostEqual(entity.ServerPos, previousPos))
+                    return false;
             }
+            else
+            {
+                entity.Controls.IsFlying = true;
 
-            entity.Controls.IsFlying = true;
-            entity.Properties.Habitat = EnumHabitat.Air;
+                float targetRoll = 0;
+                float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
+                float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
 
-            float targetRoll = 0;
-            float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
-            float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
+                Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
+                if (distance > flightSpeed)
+                    targetFlyVector.Mul(flightSpeed / distance);
 
-            Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
-            if (distance > flightSpeed)
-                targetFlyVector.Mul(flightSpeed / distance);
+                float turnLimit = 0.1F;
+                entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
+                entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
+                entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
 
-            float turnLimit = 0.1F;
-            entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
-            entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
-            entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
+                double maxAcceleration = 0.01;
+                Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
+                acceleration.Sub(entity.Controls.FlyVector);
+                double accelerationMagnitude = acceleration.Length();
+                if (accelerationMagnitude > maxAcceleration)
+                    acceleration.Mul(maxAcceleration / accelerationMagnitude);
 
-            double maxAcceleration = 0.01;
-            Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
-            acceleration.Sub(entity.Controls.FlyVector);
-            double accelerationMagnitude = acceleration.Length();
-            if (accelerationMagnitude > maxAcceleration)
-                acceleration.Mul(maxAcceleration / accelerationMagnitude);
-
-            entity.Controls.FlyVector.Add(acceleration);
+                entity.Controls.FlyVector.Add(acceleration);
+            }
 
             entity.World.Logger.Debug($"habitat={entity.Properties.Habitat} pos=[{entity.ServerPos}], target=[{target}], " +
                     $"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
                     $"flyVector=[{entity.Controls.FlyVector}]");
+
+            previousPos = entity.ServerPos.Copy();
 
             return true;
         }
