@@ -15,21 +15,6 @@ namespace Birds
 {
     public class BirdMod : ModSystem
     {
-        static public bool almostEqual(double a, double b, double epsilon)
-        {
-            return Math.Abs(a - b) < epsilon;
-        }
-
-        static public bool positionAlmostEqual(EntityPos a, EntityPos b)
-        {
-            return almostEqual(a.X, b.X, .001) &&
-                almostEqual(a.Y, b.Y, .001) &&
-                almostEqual(a.Z, b.Z, .001) &&
-                almostEqual(a.Pitch, b.Pitch, .001) &&
-                almostEqual(a.Roll, b.Roll, .001) &&
-                almostEqual(a.Yaw, b.Yaw, .001);
-        }
-
         static BirdMod()
         {
             Vintagestory.GameContent.AiTaskRegistry.Register<AiTaskPerch>("perch");
@@ -55,12 +40,16 @@ namespace Birds
         int minDistance;
         int minDuration, maxDuration;
         double flightSpeed;
+
         EntityPos previousPos;
+        BlockPos bestPerch;
+        float bestPerchScore;
+        Vec3d startPos;
 
         Vintagestory.GameContent.EntityPartitioning partitionUtil;
 
-        Vec3d target = new Vec3d();
-        long endTime;
+        Vec3d target;
+        Vec3d waypoint;
 
         public AiTaskPerch(EntityAgent entity) : base(entity)
         {
@@ -89,14 +78,9 @@ namespace Birds
             return entity.World.ElapsedMilliseconds > cooldownUntilMs;
         }
 
-        public override void StartExecute()
+        float PerchScore(BlockPos p)
         {
-            entity.World.Logger.Debug("AiTaskPerch.StartExecute()");
-
-            base.StartExecute();
-
-            endTime = entity.World.ElapsedMilliseconds + minDuration + entity.World.Rand.Next(maxDuration - minDuration);
-
+            float score = 0;
             int[,] offsets = new int[,]
             {
                 { -1, -1 },
@@ -108,45 +92,149 @@ namespace Birds
                 { 1, 0 },
                 { 1, 1 }
             };
-            int bestScore = -1;
-            for (int x = (int) entity.ServerPos.X - searchRadius; x <= entity.ServerPos.X + searchRadius; x++)
-            {
-                for (int z = (int) entity.ServerPos.Z - searchRadius; z <= entity.ServerPos.Z + searchRadius; z++)
-                {
-                    if (square(x - (int) entity.ServerPos.X) + square(z - (int) entity.ServerPos.Z) < square(minDistance))
-                        continue;
 
-                    int smallestDelta = 1024;
-                    int heightHere = entity.World.BlockAccessor.GetRainMapHeightAt(new BlockPos(x, 0, z));
-                    for (int i = 0; i < offsets.GetLength(0); i++)
+            int heightHere = entity.World.BlockAccessor.GetRainMapHeightAt(p);
+            for (int i = 0; i < offsets.GetLength(0); i++)
+            {
+                BlockPos neighbor = new BlockPos(p.X + offsets[i, 0], p.Y, p.Z + offsets[i, 1]);
+                score += heightHere - entity.World.BlockAccessor.GetRainMapHeightAt(neighbor);
+            }
+
+            return score;
+        }
+
+        void FindBetterPerch()
+        {
+            // Pick a random spot in front of us.
+            double distance = 8 + entity.World.Rand.NextDouble() * (32 - 8);
+            double yaw = entity.ServerPos.Yaw + Math.PI / 3 + entity.World.Rand.NextDouble() * Math.PI / 3;
+            Vec3d spot = entity.ServerPos.XYZ.AheadCopy(distance, 0, yaw);
+            BlockPos p = new BlockPos((int)spot.X, (int)spot.Y, (int)spot.Z);
+            p.Y = entity.World.BlockAccessor.GetRainMapHeightAt(p) + 1;
+            entity.World.SpawnCubeParticles(p, p.ToVec3d(), 2, 30);
+
+            float score = PerchScore(p);
+            entity.World.Logger.Debug($"Found perch with score {score}: {p}");
+
+            if (bestPerch == null || score > bestPerchScore)
+            {
+                bestPerch = p;
+                bestPerchScore = score;
+                entity.World.Logger.Debug($"New best perch with score {bestPerchScore}: {bestPerch}");
+                target = new Vec3d(bestPerch.X + 0.5, bestPerch.Y + 0.5, bestPerch.Z + 0.5);
+            }
+        }
+
+        public override void StartExecute()
+        {
+            entity.World.Logger.Debug("AiTaskPerch.StartExecute()");
+
+            base.StartExecute();
+
+            bestPerch = null;
+            startPos = entity.ServerPos.XYZ;
+
+            target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
+            waypoint = null;
+
+            entity.World.Logger.Debug($"target={target}");
+        }
+
+        static double VecDistance(Vec3d a, Vec3d b)
+        {
+            Vec3d delta = b.Clone();
+            delta.Sub(a);
+            return delta.Length();
+        }
+
+        bool AvoidCollision()
+        {
+            Block oneAhead = entity.World.BlockAccessor.GetBlock(entity.ServerPos.AheadCopy(1).AsBlockPos);
+            Block twoAhead = entity.World.BlockAccessor.GetBlock(entity.ServerPos.AheadCopy(2).AsBlockPos);
+            if (oneAhead.Id != 0 || twoAhead.Id != 0)
+            {
+                // find some open air and go there
+                entity.World.SpawnCubeParticles(entity.ServerPos.AsBlockPos, entity.ServerPos.XYZ, 2, 20);
+                (float score, float pitch, float yaw) bestSolution = (0, 0, 0);
+                for (float yaw = 0; yaw < 2*Math.PI; yaw += (float) Math.PI/6)
+                {
+                    // Vary between 45 degrees down and up.
+                    for (float pitch = -(float) Math.PI / 2; pitch <= Math.PI / 2; pitch += (float) Math.PI/6)
                     {
-                        BlockPos pos = new BlockPos(x + offsets[i, 0], 0, z + offsets[i, 1]);
-                        smallestDelta = Math.Min(smallestDelta,
-                            Math.Abs(heightHere - entity.World.BlockAccessor.GetRainMapHeightAt(pos)));
-                    }
-                    if (smallestDelta > bestScore)
-                    {
-                        bestScore = smallestDelta;
-                        target.Set(x, heightHere + 1, z);
+                        int distance;
+                        for (distance = 1; distance < 4; distance++)
+                        {
+                            Block testBlock = entity.World.BlockAccessor.GetBlock(
+                                entity.ServerPos.XYZ.AheadCopy(distance, pitch, yaw).AsBlockPos);
+                            if (testBlock.Id != 0)
+                                break;
+                        }
+                        float score = 10 * distance - Math.Abs(entity.ServerPos.Pitch - pitch) - Math.Abs(entity.ServerPos.Yaw - yaw);
+                        if (score > bestSolution.score)
+                            bestSolution = (score: score, pitch: pitch, yaw: yaw);
                     }
                 }
+                entity.World.Logger.Debug($"bestSolution={bestSolution}");
+                if (bestSolution.score > 0)
+                {
+                    entity.Controls.FlyVector.Set(0, 0, 0);
+                    entity.ServerPos.Pitch = bestSolution.pitch;
+                    entity.ServerPos.Yaw = bestSolution.yaw;
+                    entity.ServerPos.Roll = 0;
+                    waypoint = entity.ServerPos.XYZ.AheadCopy(2, bestSolution.pitch, bestSolution.yaw);
+                    return true;
+                }
             }
-            target.X += 0.5;
-            target.Z += 0.5;
-            target.Y += 0.5;
-            entity.World.Logger.Debug($"target={target}");
+
+            return false;
         }
 
         public override bool ContinueExecute(float dt)
         {
-            Vec3d delta = new Vec3d(target.X, target.Y, target.Z);
+            entity.World.Logger.Debug($"pos=[{entity.ServerPos}], waypoint=[{waypoint}], target=[{target}]");
+
+            bool result = InternalContinueExecute(dt);
+
+            entity.World.Logger.Debug($"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
+                $"flyVector=[{entity.Controls.FlyVector}]");
+
+            return result;
+        }
+
+        bool InternalContinueExecute(float dt)
+        {
+            if (VecDistance(startPos, entity.ServerPos.XYZ) > 2 &&
+                    VecDistance(target, entity.ServerPos.XYZ) > 8)
+            {
+                FindBetterPerch();
+            } else if (bestPerchScore <= 0 && VecDistance(target, entity.ServerPos.XYZ) < 8)
+            {
+                // Didn't find a perch in this direction. Try a different direction.
+                target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
+            }
+
+            entity.World.SpawnCubeParticles(target.AsBlockPos, target, 2, 20);
+
+            if (AvoidCollision())
+                return true;
+
+            Vec3d delta;
+            if (waypoint != null)
+                delta = waypoint.Clone();
+            else
+                delta = target.Clone();
             delta.Sub(entity.ServerPos.XYZ);
             double distance = delta.Length();
             if (distance < 0.2)
             {
+                if (waypoint != null)
+                {
+                    waypoint = null;
+                    return true;
+                }
                 entity.World.Logger.Debug($"previousPosition={previousPos}, serverPos={entity.ServerPos}");
                 entity.Controls.FlyVector.Set(0, 0, 0);
-                if (BirdMod.positionAlmostEqual(entity.ServerPos, previousPos))
+                if (entity.ServerPos.BasicallySameAs(previousPos))
                     return false;
             }
             else
@@ -175,10 +263,6 @@ namespace Birds
 
                 entity.Controls.FlyVector.Add(acceleration);
             }
-
-            entity.World.Logger.Debug($"habitat={entity.Properties.Habitat} pos=[{entity.ServerPos}], target=[{target}], " +
-                    $"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
-                    $"flyVector=[{entity.Controls.FlyVector}]");
 
             previousPos = entity.ServerPos.Copy();
 
