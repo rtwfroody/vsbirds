@@ -177,12 +177,17 @@ namespace Birds
                 entity.World.Logger.Debug($"bestSolution={bestSolution}");
                 if (bestSolution.score > 0)
                 {
-                    entity.Controls.FlyVector.Set(0, 0, 0);
-                    entity.ServerPos.Pitch = bestSolution.pitch;
-                    entity.ServerPos.Yaw = bestSolution.yaw;
-                    entity.ServerPos.Roll = 0;
                     waypoint = entity.ServerPos.XYZ.AheadCopy(2, bestSolution.pitch, bestSolution.yaw);
-                    return true;
+
+                    if (oneAhead.Id == 0)
+                    {
+                        // Take drastic action to avoid imminent collision.
+                        entity.Controls.FlyVector.Set(0, 0, 0);
+                        entity.ServerPos.Pitch = bestSolution.pitch;
+                        entity.ServerPos.Yaw = bestSolution.yaw;
+                        entity.ServerPos.Roll = 0;
+                        return true;
+                    }
                 }
             }
 
@@ -192,8 +197,10 @@ namespace Birds
         public override bool ContinueExecute(float dt)
         {
             entity.World.Logger.Debug($"pos=[{entity.ServerPos}], waypoint=[{waypoint}], target=[{target}]");
+            entity.World.SpawnCubeParticles(target.AsBlockPos, target, 2, 20);
 
             bool result = InternalContinueExecute(dt);
+            previousPos = entity.ServerPos.Copy();
 
             entity.World.Logger.Debug($"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
                 $"flyVector=[{entity.Controls.FlyVector}]");
@@ -201,70 +208,68 @@ namespace Birds
             return result;
         }
 
+        void FlyTowards(Vec3d p)
+        {
+            entity.Controls.IsFlying = true;
+
+            Vec3d delta = p.Clone();
+            delta.Sub(entity.ServerPos.XYZ);
+            double distance = delta.Length();
+
+            float targetRoll = 0;
+            float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
+            float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
+
+            Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
+            if (distance > flightSpeed)
+                targetFlyVector.Mul(flightSpeed / distance);
+
+            float turnLimit = 0.1F;
+            entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
+            entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
+            entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
+
+            double maxAcceleration = 0.01;
+            Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
+            acceleration.Sub(entity.Controls.FlyVector);
+            double accelerationMagnitude = acceleration.Length();
+            if (accelerationMagnitude > maxAcceleration)
+                acceleration.Mul(maxAcceleration / accelerationMagnitude);
+
+            entity.Controls.FlyVector.Add(acceleration);
+        }
+
         bool InternalContinueExecute(float dt)
         {
+            if (VecDistance(target, entity.ServerPos.XYZ) < 0.2)
+            {
+                entity.Controls.FlyVector.Set(0, 0, 0);
+                if (entity.ServerPos.BasicallySameAs(previousPos))
+                    return false;
+                else
+                    return true;
+            }
+
             if (VecDistance(startPos, entity.ServerPos.XYZ) > 2 &&
-                    VecDistance(target, entity.ServerPos.XYZ) > 8)
-            {
+                    VecDistance(target, entity.ServerPos.XYZ) > 8) {
                 FindBetterPerch();
-            } else if (bestPerchScore <= 0 && VecDistance(target, entity.ServerPos.XYZ) < 8)
-            {
+            } else if (bestPerchScore <= 0 && VecDistance(target, entity.ServerPos.XYZ) < 8) {
                 // Didn't find a perch in this direction. Try a different direction.
                 target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
             }
 
-            entity.World.SpawnCubeParticles(target.AsBlockPos, target, 2, 20);
-
             if (AvoidCollision())
                 return true;
 
-            Vec3d delta;
+            if (waypoint != null && VecDistance(waypoint, entity.ServerPos.XYZ) < 0.2)
+                waypoint = null;
             if (waypoint != null)
-                delta = waypoint.Clone();
-            else
-                delta = target.Clone();
-            delta.Sub(entity.ServerPos.XYZ);
-            double distance = delta.Length();
-            if (distance < 0.2)
             {
-                if (waypoint != null)
-                {
-                    waypoint = null;
-                    return true;
-                }
-                entity.World.Logger.Debug($"previousPosition={previousPos}, serverPos={entity.ServerPos}");
-                entity.Controls.FlyVector.Set(0, 0, 0);
-                if (entity.ServerPos.BasicallySameAs(previousPos))
-                    return false;
-            }
-            else
-            {
-                entity.Controls.IsFlying = true;
-
-                float targetRoll = 0;
-                float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
-                float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
-
-                Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
-                if (distance > flightSpeed)
-                    targetFlyVector.Mul(flightSpeed / distance);
-
-                float turnLimit = 0.1F;
-                entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
-                entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
-                entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
-
-                double maxAcceleration = 0.01;
-                Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
-                acceleration.Sub(entity.Controls.FlyVector);
-                double accelerationMagnitude = acceleration.Length();
-                if (accelerationMagnitude > maxAcceleration)
-                    acceleration.Mul(maxAcceleration / accelerationMagnitude);
-
-                entity.Controls.FlyVector.Add(acceleration);
+                FlyTowards(waypoint);
+                return true;
             }
 
-            previousPos = entity.ServerPos.Copy();
+            FlyTowards(target);
 
             return true;
         }
