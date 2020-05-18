@@ -114,7 +114,6 @@ namespace Birds
             entity.World.SpawnCubeParticles(p, p.ToVec3d(), 2, 30);
 
             float score = PerchScore(p);
-            entity.World.Logger.Debug($"Found perch with score {score}: {p}");
 
             if (bestPerch == null || score > bestPerchScore)
             {
@@ -196,13 +195,24 @@ namespace Birds
 
         public override bool ContinueExecute(float dt)
         {
-            entity.World.Logger.Debug($"pos=[{entity.ServerPos}], waypoint=[{waypoint}], target=[{target}]");
-            entity.World.SpawnCubeParticles(target.AsBlockPos, target, 2, 20);
+            entity.World.Logger.Debug($"[{entity.EntityId}] pos=[{entity.ServerPos}], waypoint=[{waypoint}], target=[{target}]");
+
+            SimpleParticleProperties targetParticles = new SimpleParticleProperties(
+                    10, 10, ColorUtil.ColorFromRgba(220, 50, 50, 50),
+                    target, target, new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
+            entity.World.SpawnParticles(targetParticles);
+            if (waypoint != null)
+            {
+                SimpleParticleProperties waypointParticles = new SimpleParticleProperties(
+                        10, 10, ColorUtil.ColorFromRgba(50, 220, 50, 50),
+                        waypoint, waypoint, new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
+                entity.World.SpawnParticles(waypointParticles);
+            }
 
             bool result = InternalContinueExecute(dt);
             previousPos = entity.ServerPos.Copy();
 
-            entity.World.Logger.Debug($"roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
+            entity.World.Logger.Debug($"[{entity.EntityId}] roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
                 $"flyVector=[{entity.Controls.FlyVector}]");
 
             return result;
@@ -217,17 +227,19 @@ namespace Birds
             double distance = delta.Length();
 
             float targetRoll = 0;
-            float targetYaw = (float)Math.Atan2(entity.Controls.FlyVector.X, entity.Controls.FlyVector.Z);
-            float targetPitch = (float)Math.Atan(entity.Controls.FlyVector.Y);
-
-            Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
-            if (distance > flightSpeed)
-                targetFlyVector.Mul(flightSpeed / distance);
+            float targetYaw = (float)Math.Atan2(delta.X, delta.Z);
+            float targetPitch = (float)Math.Atan(delta.Y);
 
             float turnLimit = 0.1F;
             entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
             entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
             entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
+
+            /*
+            Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
+            if (distance > flightSpeed)
+                targetFlyVector.Mul(flightSpeed / distance);
+
 
             double maxAcceleration = 0.01;
             Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
@@ -237,6 +249,11 @@ namespace Birds
                 acceleration.Mul(maxAcceleration / accelerationMagnitude);
 
             entity.Controls.FlyVector.Add(acceleration);
+            */
+
+            entity.Controls.FlyVector.Set(0, 0, 0);
+            double speed = Math.Min(flightSpeed, distance / 300);
+            entity.Controls.FlyVector.Ahead(speed, entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
         }
 
         bool InternalContinueExecute(float dt)
@@ -258,7 +275,7 @@ namespace Birds
                 target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
             }
 
-            if (AvoidCollision())
+            if (VecDistance(target, entity.ServerPos.XYZ) > 2 && AvoidCollision())
                 return true;
 
             if (waypoint != null && VecDistance(waypoint, entity.ServerPos.XYZ) < 0.2)
