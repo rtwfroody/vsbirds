@@ -111,7 +111,6 @@ namespace Birds
             Vec3d spot = entity.ServerPos.XYZ.AheadCopy(distance, 0, yaw);
             BlockPos p = new BlockPos((int)spot.X, (int)spot.Y, (int)spot.Z);
             p.Y = entity.World.BlockAccessor.GetRainMapHeightAt(p) + 1;
-            entity.World.SpawnCubeParticles(p, p.ToVec3d(), 2, 30);
 
             float score = PerchScore(p);
 
@@ -146,6 +145,14 @@ namespace Birds
             return delta.Length();
         }
 
+        void DebugParticles(Vec3d position, byte r, byte g, byte b)
+        {
+            SimpleParticleProperties particles = new SimpleParticleProperties(
+                    10, 10, ColorUtil.ColorFromRgba(b, g, r, 50),
+                    position, position, new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
+            entity.World.SpawnParticles(particles);
+        }
+
         bool AvoidCollision()
         {
             Block oneAhead = entity.World.BlockAccessor.GetBlock(entity.ServerPos.AheadCopy(1).AsBlockPos);
@@ -153,7 +160,7 @@ namespace Birds
             if (oneAhead.Id != 0 || twoAhead.Id != 0)
             {
                 // find some open air and go there
-                entity.World.SpawnCubeParticles(entity.ServerPos.AsBlockPos, entity.ServerPos.XYZ, 2, 20);
+                DebugParticles(entity.ServerPos.XYZ, 255, 100, 100);
                 (float score, float pitch, float yaw) bestSolution = (0, 0, 0);
                 for (float yaw = 0; yaw < 2*Math.PI; yaw += (float) Math.PI/6)
                 {
@@ -168,7 +175,7 @@ namespace Birds
                             if (testBlock.Id != 0)
                                 break;
                         }
-                        float score = 10 * distance - Math.Abs(entity.ServerPos.Pitch - pitch) - Math.Abs(entity.ServerPos.Yaw - yaw);
+                        float score = 10 * distance - (float) VecDistance(target, entity.ServerPos.XYZ.AheadCopy(distance, pitch, yaw));
                         if (score > bestSolution.score)
                             bestSolution = (score: score, pitch: pitch, yaw: yaw);
                     }
@@ -197,17 +204,9 @@ namespace Birds
         {
             entity.World.Logger.Debug($"[{entity.EntityId}] pos=[{entity.ServerPos}], waypoint=[{waypoint}], target=[{target}]");
 
-            SimpleParticleProperties targetParticles = new SimpleParticleProperties(
-                    10, 10, ColorUtil.ColorFromRgba(220, 50, 50, 50),
-                    target, target, new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
-            entity.World.SpawnParticles(targetParticles);
+            DebugParticles(target, 255, 255, 255);
             if (waypoint != null)
-            {
-                SimpleParticleProperties waypointParticles = new SimpleParticleProperties(
-                        10, 10, ColorUtil.ColorFromRgba(50, 220, 50, 50),
-                        waypoint, waypoint, new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
-                entity.World.SpawnParticles(waypointParticles);
-            }
+                DebugParticles(waypoint, 100, 255, 100);
 
             bool result = InternalContinueExecute(dt);
             previousPos = entity.ServerPos.Copy();
@@ -228,7 +227,7 @@ namespace Birds
 
             float targetRoll = 0;
             float targetYaw = (float)Math.Atan2(delta.X, delta.Z);
-            float targetPitch = (float)Math.Atan(delta.Y);
+            float targetPitch = (float)Math.Atan2(delta.Y, new Vec3d(delta.X, 0, delta.Z).Length());
 
             float turnLimit = 0.1F;
             entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
