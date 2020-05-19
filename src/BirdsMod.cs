@@ -41,6 +41,8 @@ namespace Birds
         int minDuration, maxDuration;
         double flightSpeed;
 
+        ICachingBlockAccessor blockAccess;
+
         EntityPos previousPos;
         BlockPos bestPerch;
         float bestPerchScore;
@@ -53,6 +55,7 @@ namespace Birds
 
         public AiTaskPerch(EntityAgent entity) : base(entity)
         {
+            blockAccess = ((ICoreServerAPI) entity.Api).WorldManager.GetCachingBlockAccessor(true, true);
         }
 
         public override void LoadConfig(JsonObject taskConfig, JsonObject aiConfig)
@@ -153,39 +156,47 @@ namespace Birds
             entity.World.SpawnParticles(particles);
         }
 
-        bool AvoidCollision()
+        /* Avoid collisions with blocks up to distance ahead. */
+        bool AvoidCollision(float distance)
         {
-            Block oneAhead = entity.World.BlockAccessor.GetBlock(entity.ServerPos.AheadCopy(1).AsBlockPos);
-            Block twoAhead = entity.World.BlockAccessor.GetBlock(entity.ServerPos.AheadCopy(2).AsBlockPos);
-            if (oneAhead.Id != 0 || twoAhead.Id != 0)
+            const float collisionStep = 0.5f;
+            float collisionDistance;
+            for (collisionDistance = collisionStep; collisionDistance < distance; collisionDistance += collisionStep)
+            {
+                if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox,
+                        entity.ServerPos.AheadCopy(collisionDistance).XYZ))
+                    break;
+            }
+
+            if (collisionDistance < distance)
             {
                 // find some open air and go there
                 DebugParticles(entity.ServerPos.XYZ, 255, 100, 100);
-                (float score, float pitch, float yaw) bestSolution = (0, 0, 0);
+                const float minScore = -1000;
+                (float score, float pitch, float yaw) bestSolution = (minScore, 0, 0);
                 for (float yaw = 0; yaw < 2*Math.PI; yaw += (float) Math.PI/6)
                 {
                     // Vary between 45 degrees down and up.
                     for (float pitch = -(float) Math.PI / 2; pitch <= Math.PI / 2; pitch += (float) Math.PI/6)
                     {
-                        int distance;
-                        for (distance = 1; distance < 4; distance++)
+                        float d;
+                        for (d = collisionStep; d < 4; d += collisionStep)
                         {
-                            Block testBlock = entity.World.BlockAccessor.GetBlock(
-                                entity.ServerPos.XYZ.AheadCopy(distance, pitch, yaw).AsBlockPos);
-                            if (testBlock.Id != 0)
+                            Vec3d pos = entity.ServerPos.XYZ.AheadCopy(d, pitch, yaw);
+                            if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox, pos))
                                 break;
+                            float score = -(float)VecDistance(target, pos);
+                            if (score > bestSolution.score)
+                                bestSolution = (score: score, pitch: pitch, yaw: yaw);
                         }
-                        float score = 10 * distance - (float) VecDistance(target, entity.ServerPos.XYZ.AheadCopy(distance, pitch, yaw));
-                        if (score > bestSolution.score)
-                            bestSolution = (score: score, pitch: pitch, yaw: yaw);
                     }
                 }
                 entity.World.Logger.Debug($"bestSolution={bestSolution}");
-                if (bestSolution.score > 0)
+                if (bestSolution.score > minScore)
                 {
                     waypoint = entity.ServerPos.XYZ.AheadCopy(2, bestSolution.pitch, bestSolution.yaw);
 
-                    if (oneAhead.Id == 0)
+                    if (collisionDistance < 1.5)
                     {
                         // Take drastic action to avoid imminent collision.
                         entity.Controls.FlyVector.Set(0, 0, 0);
@@ -217,7 +228,7 @@ namespace Birds
             return result;
         }
 
-        void FlyTowards(Vec3d p)
+        void FlyTowards(Vec3d p, bool stopThere)
         {
             entity.Controls.IsFlying = true;
 
@@ -234,28 +245,23 @@ namespace Birds
             float targetPitch = (float)Math.Atan2(delta.Y, new Vec3d(delta.X, 0, delta.Z).Length());
 
             float turnLimit = 0.1F;
-            entity.ServerPos.Roll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
-            entity.ServerPos.Yaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
-            entity.ServerPos.Pitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
+            float actualRoll = GameMath.Clamp(targetRoll, entity.ServerPos.Roll - turnLimit, entity.ServerPos.Roll + turnLimit);
+            float actualYaw = GameMath.Clamp(targetYaw, entity.ServerPos.Yaw - turnLimit, entity.ServerPos.Yaw + turnLimit);
+            float actualPitch = GameMath.Clamp(targetPitch, entity.ServerPos.Pitch - turnLimit, entity.ServerPos.Pitch + turnLimit);
 
-            /*
-            Vec3d targetFlyVector = new Vec3d(delta.X, delta.Y, delta.Z);
-            if (distance > flightSpeed)
-                targetFlyVector.Mul(flightSpeed / distance);
+            double speed = flightSpeed;
+            if (Math.Abs(actualYaw - entity.ServerPos.Yaw) +
+                Math.Abs(actualRoll - entity.ServerPos.Roll) +
+                Math.Abs(actualPitch - entity.ServerPos.Pitch) > .03)
+                speed /= 2;
 
-
-            double maxAcceleration = 0.01;
-            Vec3d acceleration = new Vec3d(targetFlyVector.X, targetFlyVector.Y, targetFlyVector.Z);
-            acceleration.Sub(entity.Controls.FlyVector);
-            double accelerationMagnitude = acceleration.Length();
-            if (accelerationMagnitude > maxAcceleration)
-                acceleration.Mul(maxAcceleration / accelerationMagnitude);
-
-            entity.Controls.FlyVector.Add(acceleration);
-            */
+            entity.ServerPos.Roll = actualRoll;
+            entity.ServerPos.Yaw = actualYaw;
+            entity.ServerPos.Pitch = actualPitch;
 
             entity.Controls.FlyVector.Set(0, 0, 0);
-            double speed = Math.Min(flightSpeed, distance / 300);
+            if (stopThere)
+                speed = Math.Min(speed, distance / 300);
             entity.Controls.FlyVector.Ahead(speed, entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
         }
 
@@ -263,6 +269,7 @@ namespace Birds
         {
             if (VecDistance(target, entity.ServerPos.XYZ) < 0.2)
             {
+                // We've arrived!
                 entity.Controls.FlyVector.Set(0, 0, 0);
                 if (entity.ServerPos.BasicallySameAs(previousPos))
                     return false;
@@ -278,18 +285,18 @@ namespace Birds
                 target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
             }
 
-            if (VecDistance(target, entity.ServerPos.XYZ) > 2 && AvoidCollision())
+            if (AvoidCollision(Math.Min(3, (float)VecDistance(target, entity.ServerPos.XYZ))))
                 return true;
 
             if (waypoint != null && VecDistance(waypoint, entity.ServerPos.XYZ) < 0.2)
                 waypoint = null;
             if (waypoint != null)
             {
-                FlyTowards(waypoint);
+                FlyTowards(waypoint, false);
                 return true;
             }
 
-            FlyTowards(target);
+            FlyTowards(target, true);
 
             return true;
         }
