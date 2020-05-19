@@ -227,6 +227,10 @@ namespace Birds
 
             float targetRoll = 0;
             float targetYaw = (float)Math.Atan2(delta.X, delta.Z);
+            if (targetYaw > entity.ServerPos.Yaw + Math.PI)
+                targetYaw -= 2*(float)Math.PI;
+            if (targetYaw < entity.ServerPos.Yaw - Math.PI)
+                targetYaw += 2*(float)Math.PI;
             float targetPitch = (float)Math.Atan2(delta.Y, new Vec3d(delta.X, 0, delta.Z).Length());
 
             float turnLimit = 0.1F;
