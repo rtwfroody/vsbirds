@@ -174,10 +174,10 @@ namespace Birds
                 DebugParticles(entity.ServerPos.XYZ, 255, 100, 100);
                 const float minScore = -1000;
                 (float score, float pitch, float yaw) bestSolution = (minScore, 0, 0);
-                for (float yaw = 0; yaw < 2*Math.PI; yaw += (float) Math.PI/6)
+                for (float yaw = 0; yaw < 2*Math.PI; yaw += (float) Math.PI/4)
                 {
                     // Vary between 45 degrees down and up.
-                    for (float pitch = -(float) Math.PI / 2; pitch <= Math.PI / 2; pitch += (float) Math.PI/6)
+                    for (float pitch = -(float) Math.PI / 2; pitch <= Math.PI / 2; pitch += (float) Math.PI/4)
                     {
                         float d;
                         for (d = collisionStep; d < 4; d += collisionStep)
