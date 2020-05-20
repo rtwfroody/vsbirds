@@ -150,10 +150,12 @@ namespace Birds
 
         void DebugParticles(Vec3d position, byte r, byte g, byte b)
         {
+#if DEBUG
             SimpleParticleProperties particles = new SimpleParticleProperties(
                     10, 10, ColorUtil.ColorFromRgba(b, g, r, 50),
-                    position, position, new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
+                    position, new Vec3d(position.X, position.Y + 1, position.Z), new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
             entity.World.SpawnParticles(particles);
+#endif
         }
 
         /* Avoid collisions with blocks up to distance ahead. */
@@ -161,7 +163,7 @@ namespace Birds
         {
             const float collisionStep = 0.5f;
             float collisionDistance;
-            for (collisionDistance = collisionStep; collisionDistance < distance; collisionDistance += collisionStep)
+            for (collisionDistance = 0; collisionDistance < distance; collisionDistance += collisionStep)
             {
                 if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox,
                         entity.ServerPos.AheadCopy(collisionDistance).XYZ))
@@ -180,7 +182,7 @@ namespace Birds
                     for (float pitch = -(float) Math.PI / 2; pitch <= Math.PI / 2; pitch += (float) Math.PI/4)
                     {
                         float d;
-                        for (d = collisionStep; d < 4; d += collisionStep)
+                        for (d = 0; d < 4; d += collisionStep)
                         {
                             Vec3d pos = entity.ServerPos.XYZ.AheadCopy(d, pitch, yaw);
                             if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox, pos))
@@ -199,12 +201,23 @@ namespace Birds
                     if (collisionDistance < 1.5)
                     {
                         // Take drastic action to avoid imminent collision.
-                        entity.Controls.FlyVector.Set(0, 0, 0);
                         entity.ServerPos.Pitch = bestSolution.pitch;
                         entity.ServerPos.Yaw = bestSolution.yaw;
                         entity.ServerPos.Roll = 0;
+                        entity.Controls.FlyVector.Set(0, 0, 0);
+                        entity.Controls.FlyVector.Ahead(flightSpeed / 2, entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
                         return true;
                     }
+                }
+                else
+                {
+                    // No solution found. We're probably stuck inside a block. Die a little.
+                    entity.ReceiveDamage(
+                        new DamageSource()
+                        {
+                            Source = EnumDamageSource.Block,
+                            Type = EnumDamageType.Crushing
+                        }, 1);
                 }
             }
 
