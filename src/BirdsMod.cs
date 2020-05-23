@@ -122,7 +122,7 @@ namespace Birds
                 bestPerch = p;
                 bestPerchScore = score;
                 entity.World.Logger.Debug($"New best perch with score {bestPerchScore}: {bestPerch}");
-                target = new Vec3d(bestPerch.X + 0.5, bestPerch.Y + 0.5, bestPerch.Z + 0.5);
+                target = new Vec3d(bestPerch.X + 0.5, bestPerch.Y, bestPerch.Z + 0.5);
             }
         }
 
@@ -163,12 +163,16 @@ namespace Birds
         {
             const float collisionStep = 0.5f;
             float collisionDistance;
+            Cuboidf cb = entity.CollisionBox;
+            entity.World.Logger.Debug($"collisionBox={cb.X1}/{cb.Y1}/{cb.Z1} -- {cb.X2}/{cb.Y2}/{cb.Z2}");
             for (collisionDistance = 0; collisionDistance < distance; collisionDistance += collisionStep)
             {
                 if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox,
                         entity.ServerPos.AheadCopy(collisionDistance).XYZ))
                     break;
             }
+
+            entity.World.Logger.Debug($"collisionDistance={collisionDistance} distance={distance}");
 
             if (collisionDistance < distance)
             {
@@ -182,14 +186,21 @@ namespace Birds
                     for (float pitch = -(float) Math.PI / 2; pitch <= Math.PI / 2; pitch += (float) Math.PI/4)
                     {
                         float d;
-                        for (d = 0; d < 4; d += collisionStep)
+                        // Don't start at 0, because we might be just barely in a collision already.
+                        for (d = collisionStep; d < 4; d += collisionStep)
                         {
                             Vec3d pos = entity.ServerPos.XYZ.AheadCopy(d, pitch, yaw);
                             if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox, pos))
                                 break;
-                            float score = -(float)VecDistance(target, pos);
-                            if (score > bestSolution.score)
-                                bestSolution = (score: score, pitch: pitch, yaw: yaw);
+                            float distanceToTarget = (float)VecDistance(target, pos);
+                            // Don't pick a waypoint too close to the target, or else we won't have
+                            // the turn radius to make it to the target once we get there.
+                            if (distance < 2)
+                            {
+                                float score = -(float)distanceToTarget;
+                                if (score > bestSolution.score)
+                                    bestSolution = (score: score, pitch: pitch, yaw: yaw);
+                            }
                         }
                     }
                 }
@@ -212,12 +223,13 @@ namespace Birds
                 else
                 {
                     // No solution found. We're probably stuck inside a block. Die a little.
-                    entity.ReceiveDamage(
+                    /*entity.ReceiveDamage(
                         new DamageSource()
                         {
                             Source = EnumDamageSource.Block,
                             Type = EnumDamageType.Crushing
-                        }, 1);
+                        }, 1);*/
+                    DebugParticles(entity.ServerPos.XYZ, 255, 0, 0);
                 }
             }
 
@@ -244,6 +256,7 @@ namespace Birds
         void FlyTowards(Vec3d p, bool stopThere)
         {
             entity.Controls.IsFlying = true;
+            entity.Properties.Habitat = EnumHabitat.Air;
 
             Vec3d delta = p.Clone();
             delta.Sub(entity.ServerPos.XYZ);
@@ -278,6 +291,15 @@ namespace Birds
             entity.Controls.FlyVector.Ahead(speed, entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
         }
 
+        void LandAt(Vec3d p)
+        {
+            float distance = (float)VecDistance(entity.ServerPos.XYZ, p);
+            // Come in a little high, and then go down to land the last bit.
+            if (distance > 1)
+                p = new Vec3d(p.X, p.Y + 0.2, p.Z);
+            FlyTowards(p, true);
+        }
+
         bool InternalContinueExecute(float dt)
         {
             if (VecDistance(target, entity.ServerPos.XYZ) < 0.2)
@@ -309,7 +331,7 @@ namespace Birds
                 return true;
             }
 
-            FlyTowards(target, true);
+            LandAt(target);
 
             return true;
         }
@@ -317,6 +339,8 @@ namespace Birds
         public override void FinishExecute(bool cancelled)
         {
             entity.World.Logger.Debug($"AiTaskPerch.FinishExecute(cancelled={cancelled})");
+            entity.Controls.IsFlying = false;
+            entity.Properties.Habitat = EnumHabitat.Land;
             base.FinishExecute(cancelled);
         }
     }
