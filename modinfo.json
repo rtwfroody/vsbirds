@@ -3,7 +3,7 @@
   "modid": "birds",
   "name": "birds",
   "author": "Tim Newsome <tim@casualhacker.net>",
-  "description": "To be added",
+  "description": "Make the world feel more alive by adding birds!",
   "version": "1.0.0",
   "dependency": {
     "game": "1.12.14"

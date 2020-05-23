@@ -7,8 +7,8 @@ using Vintagestory.API;
 using Vintagestory.API.Common.Entities;
 
 [assembly: ModInfo( "Birds",
-    Description = "TODO",
-    Website     = "TODO",
+    Description = "Make the world feel more alive by adding birds!",
+    Website     = "https://github.com/rtwfroody/vsbirds",
     Authors     = new []{ "Tim Newsome <tim@casualhacker.net>" } )]
 
 namespace Birds
@@ -138,7 +138,7 @@ namespace Birds
             target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
             waypoint = null;
 
-            entity.World.Logger.Debug($"target={target}");
+            entity.World.Logger.Debug($"target={Fmt(target)}");
         }
 
         static double VecDistance(Vec3d a, Vec3d b)
@@ -195,7 +195,7 @@ namespace Birds
                             float distanceToTarget = (float)VecDistance(target, pos);
                             // Don't pick a waypoint too close to the target, or else we won't have
                             // the turn radius to make it to the target once we get there.
-                            if (distance < 2)
+                            if (distanceToTarget > 2)
                             {
                                 float score = -(float)distanceToTarget;
                                 if (score > bestSolution.score)
@@ -217,6 +217,11 @@ namespace Birds
                         entity.ServerPos.Roll = 0;
                         entity.Controls.FlyVector.Set(0, 0, 0);
                         entity.Controls.FlyVector.Ahead(flightSpeed / 2, entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
+                        if (collisionDistance <= 0)
+                        {
+                            // We might be completely stuck. Warp a little.
+                            entity.ServerPos.Y += .1;
+                        }
                         return true;
                     }
                 }
@@ -236,9 +241,23 @@ namespace Birds
             return false;
         }
 
+        public string Fmt(EntityPos p)
+        {
+            if (p == null)
+                return "(null)";
+            return $"(XYZ={p.X:F2}/{p.Y:F2}/{p.Z:F2} YPR={p.Yaw:F2}/{p.Pitch:F2}/{p.Roll:F2})";
+        }
+
+        public string Fmt(Vec3d v)
+        {
+            if (v == null)
+                return "(null)";
+            return $"(XYZ={v.X:F3}/{v.Y:F3}/{v.Z:F3})";
+        }
+
         public override bool ContinueExecute(float dt)
         {
-            entity.World.Logger.Debug($"[{entity.EntityId}] pos=[{entity.ServerPos}], waypoint=[{waypoint}], target=[{target}]");
+            entity.World.Logger.Debug($"[{entity.EntityId}] pos={Fmt(entity.ServerPos)} waypoint={Fmt(waypoint)}, target={Fmt(target)}");
 
             DebugParticles(target, 255, 255, 255);
             if (waypoint != null)
@@ -247,8 +266,8 @@ namespace Birds
             bool result = InternalContinueExecute(dt);
             previousPos = entity.ServerPos.Copy();
 
-            entity.World.Logger.Debug($"[{entity.EntityId}] roll={entity.ServerPos.Roll}, yaw={entity.ServerPos.Yaw}, pitch={entity.ServerPos.Pitch}, " +
-                $"flyVector=[{entity.Controls.FlyVector}]");
+            entity.World.Logger.Debug($"  pos={Fmt(entity.ServerPos)} " +
+                $"flyVector={Fmt(entity.Controls.FlyVector)}");
 
             return result;
         }
@@ -256,6 +275,8 @@ namespace Birds
         void FlyTowards(Vec3d p, bool stopThere)
         {
             entity.Controls.IsFlying = true;
+            entity.Controls.IsStepping = false;
+
             entity.Properties.Habitat = EnumHabitat.Air;
 
             Vec3d delta = p.Clone();
