@@ -68,7 +68,13 @@
                 "easeInSpeed": 4,
                 "easeOutSpeed": 4,
                 "blendMode": "Average"
-            }
+            },
+            {
+                "code": "flap",
+                "animation": "flap",
+                "animationSpeed": 1,
+                "weight": 10
+            },
         ]
     },
     "server": {
