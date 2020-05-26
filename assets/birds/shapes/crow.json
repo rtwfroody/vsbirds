@@ -466,45 +466,27 @@
 			"name": "Idle",
 			"code": "idle",
 			"quantityframes": 30,
-			"onActivityStopped": "EaseOut",
+			"onActivityStopped": "Stop",
 			"onAnimationEnd": "Repeat",
 			"keyframes": [
 				{
 					"frame": 0,
 					"elements": {
 						"Body": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
-						"tail": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
-						"right wing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 }
+						"left wing": { "rotationX": -0.0, "rotationY": 90.0, "rotationZ": -90.0 },
+						"left forewing": { "rotationX": 180.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"right wing": { "rotationX": 0.0, "rotationY": -90.0, "rotationZ": -90.0 },
+						"right forewing": { "rotationX": -180.0, "rotationY": 0.0, "rotationZ": 0.0 }
 					}
 				},
 				{
 					"frame": 15,
 					"elements": {
 						"Body": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": -1.0 },
-						"tail": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
-						"right wing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 }
-					}
-				}
-			]
-		},
-
-		{
-			"name": "Sit",
-			"code": "sit",
-			"quantityframes": 30,
-			"onActivityStopped": "EaseOut",
-			"onAnimationEnd": "Repeat",
-			"keyframes": [
-				{
-					"frame": 0,
-					"elements": {
-						"Body": { "offsetX": 0.0, "offsetY": -4.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 3.0 }
-					}
-				},
-				{
-					"frame": 15,
-					"elements": {
-						"Body": { "offsetX": 0.0, "offsetY": -4.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 2.0 }
+						"left wing": { "rotationX": -0.0, "rotationY": 90.0, "rotationZ": -90.0 },
+						"left forewing": { "rotationX": 180.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"right wing": { "rotationX": 0.0, "rotationY": -90.0, "rotationZ": -90.0 },
+						"right forewing": { "rotationX": -180.0, "rotationY": 0.0, "rotationZ": 0.0 }
 					}
 				}
 			]
@@ -536,7 +518,7 @@
 			"name": "Flap",
 			"code": "flap",
 			"quantityframes": 28,
-			"onActivityStopped": "PlayTillEnd",
+			"onActivityStopped": "EaseOut",
 			"onAnimationEnd": "Repeat",
 			"keyframes": [
 				{
