@@ -22,6 +22,15 @@ namespace Birds
 
         public override void Start(ICoreAPI api)
         {
+            for (double yaw = 0; yaw < 2 * Math.PI; yaw += Math.PI/2)
+            {
+                for (double pitch = 0; pitch < 2 * Math.PI; pitch += Math.PI / 2)
+                {
+                    Vec3d p = new Vec3d(0, 0, 0);
+                    p.Ahead(1, pitch, yaw);
+                    api.World.Logger.Debug($"yaw={yaw:F2} pitch={pitch:F2} x={p.X:F2} y={p.Y:F2} z={p.Z:F2}");
+                }
+            }
         }
 
         public override void StartClientSide(ICoreClientAPI api)
@@ -84,6 +93,7 @@ namespace Birds
         float PerchScore(BlockPos p)
         {
             float score = 0;
+
             int[,] offsets = new int[,]
             {
                 { -1, -1 },
@@ -109,7 +119,7 @@ namespace Birds
         void FindBetterPerch()
         {
             // Pick a random spot in front of us.
-            double distance = 8 + entity.World.Rand.NextDouble() * (32 - 8);
+            double distance = 8 + entity.World.Rand.NextDouble() * (searchRadius - 8);
             double yaw = entity.ServerPos.Yaw + Math.PI / 3 + entity.World.Rand.NextDouble() * Math.PI / 3;
             Vec3d spot = entity.ServerPos.XYZ.AheadCopy(distance, 0, yaw);
             BlockPos p = new BlockPos((int)spot.X, (int)spot.Y, (int)spot.Z);
@@ -138,6 +148,30 @@ namespace Birds
             target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
             waypoint = null;
 
+#if DEBUG
+            // Look for quartz, which I'm using to make the crow
+            // fly routes that I need for testing.
+            for (int x = -searchRadius; x <= searchRadius; x++)
+            {
+                for (int z = -searchRadius; z <= searchRadius; z++)
+                {
+                    if (Math.Abs(x) + Math.Abs(z) < 8)
+                        continue;
+                    BlockPos q = new BlockPos((int)entity.ServerPos.X + x, 0, (int)entity.ServerPos.Z + z);
+                    q.Y = entity.World.BlockAccessor.GetRainMapHeightAt(q);
+                    Block b = entity.World.BlockAccessor.GetBlock(q);
+                    if (b.Id == 2413) // crystal rose quartz large
+                    {
+                        q.Y += 1;
+                        bestPerch = q;
+                        target = new Vec3d(bestPerch.X + 0.5, bestPerch.Y, bestPerch.Z + 0.5);
+                        bestPerchScore = 10000;
+                        break;
+                    }
+                }
+            }
+#endif
+
             entity.World.Logger.Debug($"target={Fmt(target)}");
         }
 
@@ -148,11 +182,14 @@ namespace Birds
             return delta.Length();
         }
 
-        void DebugParticles(Vec3d position, byte r, byte g, byte b)
+        // To make the bird look right, we need to adjust yaw by 90 degrees.
+        // But then Ahead() is (obviously) off by 90 degrees as well, so we have to compensate for that.
+
+        void DebugParticles(Vec3d position, byte r, byte g, byte b, int quantity=5)
         {
 #if DEBUG
             SimpleParticleProperties particles = new SimpleParticleProperties(
-                    10, 10, ColorUtil.ColorFromRgba(b, g, r, 50),
+                    quantity, quantity, ColorUtil.ColorFromRgba(b, g, r, 50),
                     position, new Vec3d(position.X, position.Y + 1, position.Z), new Vec3f(-1, -1, -1), new Vec3f(1, 1, 1));
             entity.World.SpawnParticles(particles);
 #endif
@@ -161,25 +198,28 @@ namespace Birds
         /* Avoid collisions with blocks up to distance ahead. */
         bool AvoidCollision(float distance)
         {
-            const float collisionStep = 0.5f;
+            const float collisionStep = 0.1f;
             float collisionDistance;
             Cuboidf cb = entity.CollisionBox;
-            entity.World.Logger.Debug($"collisionBox={cb.X1}/{cb.Y1}/{cb.Z1} -- {cb.X2}/{cb.Y2}/{cb.Z2}");
+            entity.World.Logger.Debug($"  collisionBox={cb.X1}/{cb.Y1}/{cb.Z1} -- {cb.X2}/{cb.Y2}/{cb.Z2}");
             for (collisionDistance = 0; collisionDistance < distance; collisionDistance += collisionStep)
             {
+                Vec3d testPos = entity.ServerPos.XYZ.Ahead(collisionStep, entity.ServerPos.Pitch, entity.ServerPos.Yaw - Math.PI / 2);
+                //Vec3d testPos = entity.ServerPos.AheadCopy(collisionDistance).XYZ;
+                DebugParticles(testPos, 100, 100, 100, quantity:1);
                 if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox,
-                        entity.ServerPos.AheadCopy(collisionDistance).XYZ))
+                        testPos))
                     break;
             }
 
-            entity.World.Logger.Debug($"collisionDistance={collisionDistance} distance={distance}");
+            entity.World.Logger.Debug($"  collisionDistance={collisionDistance} distance={distance}");
 
             if (collisionDistance < distance)
             {
                 // find some open air and go there
                 DebugParticles(entity.ServerPos.XYZ, 255, 100, 100);
                 const float minScore = -1000;
-                (float score, float pitch, float yaw) bestSolution = (minScore, 0, 0);
+                (float score, float distance, float yaw, float pitch) bestSolution = (minScore, 0, 0, 0);
                 for (float yaw = 0; yaw < 2*Math.PI; yaw += (float) Math.PI/4)
                 {
                     // Vary between 45 degrees down and up.
@@ -197,17 +237,18 @@ namespace Birds
                             // the turn radius to make it to the target once we get there.
                             if (distanceToTarget > 2)
                             {
-                                float score = -(float)distanceToTarget;
+                                float score = -(float)distanceToTarget + d / 2;
                                 if (score > bestSolution.score)
-                                    bestSolution = (score: score, pitch: pitch, yaw: yaw);
+                                    bestSolution = (score: score, distance: d, yaw: yaw, pitch: pitch);
                             }
                         }
                     }
                 }
-                entity.World.Logger.Debug($"bestSolution={bestSolution}");
+                entity.World.Logger.Debug($"  bestSolution={bestSolution}");
                 if (bestSolution.score > minScore)
                 {
-                    waypoint = entity.ServerPos.XYZ.AheadCopy(2, bestSolution.pitch, bestSolution.yaw);
+                    waypoint = entity.ServerPos.XYZ.AheadCopy(bestSolution.distance, bestSolution.pitch, bestSolution.yaw);
+                    entity.World.Logger.Debug($"  waypoint={Fmt(waypoint)}");
 
                     if (collisionDistance < 1.5)
                     {
