@@ -42,6 +42,11 @@ namespace Birds
         }
     }
 
+    // There's a difference between travel yaw/pitch and the display yaw/pitch.
+    // Presumably this can be fixed by changing the model. I don't understand why there is a difference.
+    // for yaw: display + PI/2 = travel
+    // for pitch: display = -travel
+
     public class AiTaskPerch : Vintagestory.API.Common.AiTaskBase
     {
         // Configuration parameters.
@@ -204,8 +209,8 @@ namespace Birds
             entity.World.Logger.Debug($"  collisionBox={cb.X1}/{cb.Y1}/{cb.Z1} -- {cb.X2}/{cb.Y2}/{cb.Z2}");
             for (collisionDistance = 0; collisionDistance < distance; collisionDistance += collisionStep)
             {
-                Vec3d testPos = entity.ServerPos.XYZ.Ahead(collisionStep, entity.ServerPos.Pitch, entity.ServerPos.Yaw - Math.PI / 2);
-                //Vec3d testPos = entity.ServerPos.AheadCopy(collisionDistance).XYZ;
+                Vec3d testPos = entity.ServerPos.XYZ.Ahead(collisionDistance, -entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
+                //entity.World.Logger.Debug($"    testPos={Fmt(testPos)}");
                 DebugParticles(testPos, 100, 100, 100, quantity:1);
                 if (entity.World.CollisionTester.IsColliding(blockAccess, entity.CollisionBox,
                         testPos))
@@ -237,7 +242,8 @@ namespace Birds
                             // the turn radius to make it to the target once we get there.
                             if (distanceToTarget > 2)
                             {
-                                float score = -(float)distanceToTarget + d / 2;
+                                float score = -(float)distanceToTarget + d;
+                                entity.World.Logger.Debug($"    score={score:F2} yaw={yaw:F2} pitch={pitch:F2} d={d:F2} distanceToTarget={distanceToTarget:F2} pos={Fmt(pos)}");
                                 if (score > bestSolution.score)
                                     bestSolution = (score: score, distance: d, yaw: yaw, pitch: pitch);
                             }
@@ -253,11 +259,11 @@ namespace Birds
                     if (collisionDistance < 1.5)
                     {
                         // Take drastic action to avoid imminent collision.
-                        entity.ServerPos.Pitch = bestSolution.pitch;
-                        entity.ServerPos.Yaw = bestSolution.yaw;
+                        entity.ServerPos.Pitch = -bestSolution.pitch;
+                        entity.ServerPos.Yaw = bestSolution.yaw - (float)Math.PI / 2;
                         entity.ServerPos.Roll = 0;
                         entity.Controls.FlyVector.Set(0, 0, 0);
-                        entity.Controls.FlyVector.Ahead(flightSpeed / 2, entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
+                        entity.Controls.FlyVector.Ahead(flightSpeed / 2, bestSolution.pitch, bestSolution.yaw);
                         if (collisionDistance <= 0)
                         {
                             // We might be completely stuck. Warp a little.
