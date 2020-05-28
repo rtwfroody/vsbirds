@@ -202,7 +202,10 @@ namespace Birds
                 updateDestination(p);
 
             if (waypoint != null)
+            {
                 p = waypoint;
+                DebugParticles(waypoint, 50, 255, 50, 1);
+            }
 
             entity.Controls.IsFlying = true;
             entity.Controls.IsStepping = false;
@@ -438,8 +441,11 @@ namespace Birds
         public override void FinishExecute(bool cancelled)
         {
             entity.World.Logger.Debug($"AiTaskPerch.FinishExecute(cancelled={cancelled})");
-            entity.Controls.IsFlying = false;
-            entity.Properties.Habitat = EnumHabitat.Land;
+            // It would be nice to let regular game gravity work while we're perched, but
+            // then if we try to perch on leaves in a tree, we drop through them to the ground.
+            // If the tree is tall, this kills the bird.
+            //entity.Controls.IsFlying = false;
+            //entity.Properties.Habitat = EnumHabitat.Land;
             base.FinishExecute(cancelled);
         }
     }
