@@ -83,6 +83,11 @@ namespace Birds
             return $"(XYZ={v.X:F3}/{v.Y:F3}/{v.Z:F3})";
         }
 
+        public string Fmt(Cuboidf cuboid)
+        {
+            return $"{cuboid.MinX:F2},{cuboid.MaxX:F2}/{cuboid.MinY:F2},{cuboid.MaxY:F2}/{cuboid.MinZ:F2},{cuboid.MaxZ:F2}";
+        }
+
         public double VecDistance(Vec3d a, Vec3d b)
         {
             Vec3d delta = b.Clone();
@@ -133,7 +138,7 @@ namespace Birds
                             if (distanceToTarget > 2)
                             {
                                 float score = -(float)distanceToTarget + d;
-                                entity.World.Logger.Debug($"    score={score:F2} yaw={yaw:F2} pitch={pitch:F2} d={d:F2} distanceToTarget={distanceToTarget:F2} pos={Fmt(pos)}");
+                                //entity.World.Logger.Debug($"    score={score:F2} yaw={yaw:F2} pitch={pitch:F2} d={d:F2} distanceToTarget={distanceToTarget:F2} pos={Fmt(pos)}");
                                 if (score > bestSolution.score)
                                     bestSolution = (score: score, distance: d, yaw: yaw, pitch: pitch);
                             }
@@ -357,7 +362,7 @@ namespace Birds
             double yaw = entity.ServerPos.Yaw + Math.PI / 3 + entity.World.Rand.NextDouble() * Math.PI / 3;
             Vec3d spot = entity.ServerPos.XYZ.AheadCopy(distance, 0, yaw);
             BlockPos p = new BlockPos((int)spot.X, (int)spot.Y, (int)spot.Z);
-            p.Y = entity.World.BlockAccessor.GetRainMapHeightAt(p) + 1;
+            p.Y = entity.World.BlockAccessor.GetRainMapHeightAt(p);
 
             float score = PerchScore(p);
 
@@ -365,8 +370,16 @@ namespace Birds
             {
                 bestPerch = p;
                 bestPerchScore = score;
+                Block b = entity.World.BlockAccessor.GetBlock(p);
+                float maxHeight = 0;
+                if (b.CollisionBoxes != null) {
+                    foreach (Cuboidf cuboid in b.CollisionBoxes)
+                    {
+                        maxHeight = Math.Max(maxHeight, cuboid.Height);
+                    }
+                }
                 entity.World.Logger.Debug($"New best perch with score {bestPerchScore}: {bestPerch}");
-                target = new Vec3d(bestPerch.X + 0.5, bestPerch.Y, bestPerch.Z + 0.5);
+                target = new Vec3d(bestPerch.X + 0.5, bestPerch.Y + maxHeight, bestPerch.Z + 0.5);
             }
         }
 
@@ -444,6 +457,8 @@ namespace Birds
             // It would be nice to let regular game gravity work while we're perched, but
             // then if we try to perch on leaves in a tree, we drop through them to the ground.
             // If the tree is tall, this kills the bird.
+            entity.ServerPos.Pitch = 0;
+            entity.ServerPos.Roll = 0;
             //entity.Controls.IsFlying = false;
             //entity.Properties.Habitat = EnumHabitat.Land;
             base.FinishExecute(cancelled);
