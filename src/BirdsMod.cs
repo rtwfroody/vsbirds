@@ -98,7 +98,7 @@ namespace Birds
         /* Avoid collisions with blocks up to distance ahead. */
         private bool AvoidCollision(float distance)
         {
-            const float collisionStep = 0.1f;
+            const float collisionStep = 0.5f;
             float collisionDistance;
             Cuboidf cb = entity.CollisionBox;
             entity.World.Logger.Debug($"  collisionBox={cb.X1}/{cb.Y1}/{cb.Z1} -- {cb.X2}/{cb.Y2}/{cb.Z2}");
