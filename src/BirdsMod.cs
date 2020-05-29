@@ -185,6 +185,7 @@ namespace Birds
 
         void updateDestination(Vec3d p)
         {
+            entity.World.Logger.Debug($"  updateDestination({Fmt(p)})");
             destination = p;
             waypoint = null;
         }
@@ -203,13 +204,21 @@ namespace Birds
         // Return true if we have further to go, false otherwise.
         bool FlyTowards(Vec3d p, bool stopThere)
         {
-            if (!p.Equals(destination))
+            if (destination == null || VecDistance(p, destination) > .01)
                 updateDestination(p);
 
             if (waypoint != null)
             {
-                p = waypoint;
-                DebugParticles(waypoint, 50, 255, 50, 1);
+                if (VecDistance(entity.ServerPos.XYZ, waypoint) < 0.2)
+                {
+                    waypoint = null;
+                }
+                else
+                {
+                    p = waypoint;
+                    stopThere = false;
+                    DebugParticles(waypoint, 50, 255, 50, 1);
+                }
             }
 
             entity.Controls.IsFlying = true;
