@@ -3,6 +3,7 @@ using Vintagestory.API.Common;
 using Vintagestory.API.Server;
 using Vintagestory.API.MathTools;
 using System;
+using System.Collections.Generic;
 using Vintagestory.API;
 using Vintagestory.API.Common.Entities;
 
@@ -58,6 +59,14 @@ namespace Birds
         Vec3d destination;
         EntityPos previousPos;
         Vec3d waypoint;
+        List<Vec3d> waypointHistory;
+
+        public enum Result
+        {
+            Complete,
+            Incomplete,
+            Unreachable
+        }
 
         public void DebugParticles(Vec3d position, byte r, byte g, byte b, int quantity = 5)
         {
@@ -96,6 +105,7 @@ namespace Birds
         }
 
         /* Avoid collisions with blocks up to distance ahead. */
+        // Return true if the collision can be avoided while making progress, false otherwise.
         private bool AvoidCollision(float distance)
         {
             const float collisionStep = 0.5f;
@@ -149,6 +159,15 @@ namespace Birds
                 if (bestSolution.score > minScore)
                 {
                     waypoint = entity.ServerPos.XYZ.AheadCopy(bestSolution.distance, bestSolution.pitch, bestSolution.yaw);
+                    foreach (Vec3d w in waypointHistory)
+                    {
+                        // If we're setting a waypoint that's really close to one
+                        // we already set, we're probably stuck in some kind of loop,
+                        // and we should try to go somewhere else (or use a different algorithm).
+                        if (VecDistance(w, waypoint) < 0.2)
+                            return false;
+                    }
+                    waypointHistory.Add(waypoint);
                     entity.World.Logger.Debug($"  waypoint={Fmt(waypoint)}");
 
                     if (collisionDistance < 1.5)
@@ -164,13 +183,14 @@ namespace Birds
                             // We might be completely stuck. Warp a little.
                             entity.ServerPos.Y += .1;
                         }
-                        return true;
                     }
                 }
                 else
                 {
-                    // No solution found. We're probably stuck inside a block. Die a little.
-                    /*entity.ReceiveDamage(
+                    // No solution found. We're probably stuck inside a block.
+                    /*
+                     // Die a little.
+                     entity.ReceiveDamage(
                         new DamageSource()
                         {
                             Source = EnumDamageSource.Block,
@@ -180,7 +200,7 @@ namespace Birds
                 }
             }
 
-            return false;
+            return true;
         }
 
         void updateDestination(Vec3d p)
@@ -188,6 +208,7 @@ namespace Birds
             entity.World.Logger.Debug($"  updateDestination({Fmt(p)})");
             destination = p;
             waypoint = null;
+            waypointHistory = new List<Vec3d>();
         }
 
         public FlightControl(EntityAgent entity)
@@ -202,7 +223,7 @@ namespace Birds
         }
 
         // Return true if we have further to go, false otherwise.
-        bool FlyTowards(Vec3d p, bool stopThere)
+        Result FlyTowards(Vec3d p, bool stopThere)
         {
             if (destination == null || VecDistance(p, destination) > .01)
                 updateDestination(p);
@@ -230,7 +251,7 @@ namespace Birds
             delta.Sub(entity.ServerPos.XYZ);
             float distance = (float)delta.Length();
             if (distance < arrivalDistance)
-                return false;
+                return Result.Complete;
 
             float targetRoll = 0;
             float targetYaw = (float)Math.Atan2(delta.X, delta.Z);
@@ -261,14 +282,14 @@ namespace Birds
             entity.Controls.FlyVector.Ahead(speed, entity.ServerPos.Pitch, entity.ServerPos.Yaw + Math.PI / 2);
 
             // All set up for what we want to do. But if that's going to lead to a collision, that's more important.
-            if (waypoint == null)
-                AvoidCollision(Math.Min(3, distance));
+            if (waypoint == null && !AvoidCollision(Math.Min(3, distance)))
+                return Result.Unreachable;
 
-            return true;
+            return Result.Incomplete;
         }
 
         // Return true if we have further to go, false otherwise.
-        public bool LandAt(Vec3d p)
+        public Result LandAt(Vec3d p)
         {
             float distance = (float)VecDistance(entity.ServerPos.XYZ, p);
             // Come in a little high, and then go down to land the last bit.
@@ -281,18 +302,16 @@ namespace Birds
                 if (previousPos != null && entity.ServerPos.BasicallySameAs(previousPos))
                 {
                     previousPos = null;
-                    return false;
+                    return Result.Complete;
                 }
                 else
                 {
                     previousPos = entity.ServerPos.Copy();
-                    return true;
+                    return Result.Incomplete;
                 }
             }
 
-            FlyTowards(p, true);
-
-            return true;
+            return FlyTowards(p, true);
         }
 
     }
@@ -398,10 +417,7 @@ namespace Birds
 
             base.StartExecute();
 
-            bestPerch = null;
-            startPos = entity.ServerPos.XYZ;
-
-            target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
+            StartOver();
 
 #if DEBUG
             // Look for quartz, which I'm using to make the crow
@@ -430,6 +446,13 @@ namespace Birds
             entity.World.Logger.Debug($"target={fc.Fmt(target)}");
         }
 
+        void StartOver()
+        {
+            startPos = entity.ServerPos.XYZ;
+            target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
+            bestPerch = null;
+        }
+
         // To make the bird look right, we need to adjust yaw by 90 degrees.
         // But then Ahead() is (obviously) off by 90 degrees as well, so we have to compensate for that.
 
@@ -454,10 +477,22 @@ namespace Birds
                 FindBetterPerch();
             } else if (bestPerchScore <= 0 && fc.VecDistance(target, entity.ServerPos.XYZ) < 8) {
                 // Didn't find a perch in this direction. Try a different direction.
-                target = entity.ServerPos.XYZ.AheadCopy(64, 0, entity.World.Rand.NextDouble() * Math.PI * 2);
+                StartOver();
             }
 
-            return fc.LandAt(target);
+            switch (fc.LandAt(target))
+            {
+                case FlightControl.Result.Complete:
+                    return false;
+                case FlightControl.Result.Incomplete:
+                    return true;
+                case FlightControl.Result.Unreachable:
+                    // Go somewhere else.
+                    StartOver();
+                    return true;
+            }
+            // Should never get here.
+            return false;
         }
 
         public override void FinishExecute(bool cancelled)
