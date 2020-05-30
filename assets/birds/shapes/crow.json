@@ -529,7 +529,11 @@
 						"right forewing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
 						"left wing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
 						"left forewing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
-						"head": { "offsetX": 0.0, "offsetY": -1.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": -29.0 }
+						"head": { "offsetX": 0.0, "offsetY": -1.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": -29.0 },
+						"leg left": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": -83.0 },
+						"toes left": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": -140.0 },
+						"leg right": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": -83.0 },
+						"toes right": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": -140.0 }
 					}
 				},
 				{
