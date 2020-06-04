@@ -356,7 +356,10 @@
 					"elements": {
 						"Body": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
 						"tail": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
-						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 }
+						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"right forewing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"left wing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"left forewing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 }
 					}
 				},
 				{
@@ -364,23 +367,32 @@
 					"elements": {
 						"Body": { "offsetX": 1.0, "offsetY": 4.0, "offsetZ": 0.0, "rotationX": -25.0, "rotationY": 0.0, "rotationZ": -47.0 },
 						"tail": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 50.0 },
-						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 22.0, "rotationY": 155.0, "rotationZ": -25.0 }
+						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": -14.0, "rotationY": -3.0, "rotationZ": 6.0 },
+						"right forewing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"left wing": { "rotationX": -9.0, "rotationY": 66.0, "rotationZ": 60.0 },
+						"left forewing": { "rotationX": 29.0, "rotationY": -20.0, "rotationZ": 0.0 }
 					}
 				},
 				{
 					"frame": 18,
 					"elements": {
 						"Body": { "offsetX": -2.0, "offsetY": 5.0, "offsetZ": -4.0, "rotationX": -83.0, "rotationY": -25.0, "rotationZ": -89.0 },
-						"tail": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": -28.0, "rotationY": 42.0, "rotationZ": -3.0 },
-						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": -14.0, "rotationY": 147.0, "rotationZ": -33.0 }
+						"tail": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": -71.0, "rotationY": 42.0, "rotationZ": -3.0 },
+						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 89.0, "rotationY": 147.0, "rotationZ": -33.0 },
+						"right forewing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"left wing": { "rotationX": 86.0, "rotationY": 31.0, "rotationZ": 0.0 },
+						"left forewing": { "rotationX": 11.0, "rotationY": -11.0, "rotationZ": 0.0 }
 					}
 				},
 				{
 					"frame": 44,
 					"elements": {
 						"Body": { "offsetX": -2.0, "offsetY": 5.0, "offsetZ": -4.0, "rotationX": -83.0, "rotationY": -25.0, "rotationZ": -89.0 },
-						"tail": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": -28.0, "rotationY": 42.0, "rotationZ": -3.0 },
-						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": -14.0, "rotationY": 147.0, "rotationZ": -33.0 }
+						"tail": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": -69.0, "rotationY": 42.0, "rotationZ": -3.0 },
+						"right wing": { "offsetX": 0.0, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 89.0, "rotationY": 147.0, "rotationZ": -33.0 },
+						"right forewing": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"left wing": { "rotationX": 86.0, "rotationY": 31.0, "rotationZ": 0.0 },
+						"left forewing": { "rotationX": 11.0, "rotationY": -12.0, "rotationZ": 0.0 }
 					}
 				}
 			]
@@ -502,13 +514,19 @@
 				{
 					"frame": 0,
 					"elements": {
-						"Body": { "offsetX": 0.0, "offsetY": -4.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 3.0 }
+						"Body": { "offsetX": 0.0, "offsetY": -4.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 3.0 },
+						"head": { "offsetX": -0.6, "offsetY": 0.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 29.0 },
+						"right wing": { "rotationX": 0.0, "rotationY": -90.0, "rotationZ": -90.0 },
+						"right forewing": { "rotationX": -180.0, "rotationY": 0.0, "rotationZ": 0.0 },
+						"left wing": { "rotationX": 0.0, "rotationY": 90.0, "rotationZ": -90.0 },
+						"left forewing": { "rotationX": 180.0, "rotationY": 0.0, "rotationZ": 0.0 }
 					}
 				},
 				{
 					"frame": 15,
 					"elements": {
-						"Body": { "offsetX": 0.0, "offsetY": -4.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 2.0 }
+						"Body": { "offsetX": 0.0, "offsetY": -4.0, "offsetZ": 0.0, "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 2.0 },
+						"head": { "rotationX": 0.0, "rotationY": 0.0, "rotationZ": 30.0 }
 					}
 				}
 			]
